@@ -3,11 +3,9 @@ import mappy
 import numpy as np
 import editdistance
 import multiprocessing as mp
-import pyabpoa as poa
 import gc
 import os
 
-poa_aligner = poa.msa_aligner(match=5)
 
 
 def create_labeled_subreads(UMIdict,subread_files,out2):
@@ -199,7 +197,7 @@ def find_fuzzy_matches(all_indexes,first_indexes,second_indexes):
     sortedIndexes=sorted(list(all_indexes),key=lambda x:int(x[2]))
     lastIndex=sortedIndexes[-1]
     for index in sortedIndexes:
-        print('working on index number', index, 'of',lastIndex,end='\r')
+        print(f'working on index number {index[2]} of {lastIndex[2]}',' '*60,end='\r')
         index_number=index[2]
         index_sequence1=index[0]
         index_sequence2=index[1]
@@ -230,7 +228,7 @@ def find_fuzzy_matches(all_indexes,first_indexes,second_indexes):
                         chimeras.add(compare_index_number)
                         chimeras.add(new_number)
 
-    print('merged indexes',len(equivalent_indexes),'likely chimeras',len(chimeras))
+    print(f'merged {len(equivalent_indexes)} indexes',' '*60)#,'likely chimeras',len(chimeras),' '*60)
     return equivalent_indexes,chimeras
 
 def write_new_indexes(inFile,equivalent_indexes):
@@ -271,15 +269,15 @@ def read_UMI(umi_file):
         UMIdict[UMI].append(name_root)
     return UMIdict
 
-def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka):
+def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka,abpoa,racon,batch_UMI_counter,batch_UMI_total):
     '''Aligns and returns the consensus'''
-    racon='racon'
     type1='best'
     corrected_consensus = ''
     fastq_count=0
     og_reads=reads
     temp_files=[]
-    if len(reads)==1:
+    consensusCoverage=len(reads)
+    if consensusCoverage==1:
         for name,seq,qual,UMI in reads:
             main_name=name
             corrected_consensus=seq
@@ -300,12 +298,17 @@ def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka):
             index+=1
         out.close()
 
+        poa_reads = temp_folder + '/'+UMI+'_poa_reads.fasta'
+        poa_output = temp_folder + '/'+UMI+'_poa_output.fasta'
         poa_cons = temp_folder + '/'+UMI+'_poa_consensus.fasta'
         output_cons = temp_folder + '/'+UMI+'_corrected_consensus.fasta'
         overlap = temp_folder +'/'+UMI+'_overlaps.paf'
         temp_files.append(poa_cons)
         temp_files.append(output_cons)
         temp_files.append(overlap)
+        temp_files.append(poa_reads)
+        temp_files.append(poa_output)
+
         overlap_fh=open(overlap,'w')
 
         names,max_coverage,repeats,qual,raw,before,after=[[],0,0,[],[],[],[]]
@@ -326,7 +329,7 @@ def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka):
                 max_coverage=coverage
 
         ### running poa
-        if len(reads)<=2:
+        if consensusCoverage<=2:
             consensus_sequence=best
         else:
             sequences=[]
@@ -344,15 +347,36 @@ def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka):
                 print('no sequences','reads')
                 consensus_sequence = best
             else:
-                res = poa_aligner.msa(sequences, out_cons=True, out_msa=False)
-                if not res.cons_seq:
+                poa_fh=open(poa_reads,'w')
+                poaCounter=0
+                insert_lengths=[]
+                for sequence in sequences:
+                    poaCounter+=1
+                    poa_fh.write(f'>{poaCounter}\n{sequence}\n')
+                    insert_lengths.append(len(sequence))
+                poa_fh.close()
+
+                insert_length=np.median(insert_lengths)
+                if insert_length<8000:
+                    os.system(f'{abpoa} -M 5 -r 0 {poa_reads} > {poa_output} 2> apboa.messages')
+                else:
+                    os.system(f'{abpoa} -M 5 -r 0 -S {poa_reads} > {poa_output} 2> apboa.messages')
+
+                cons_seq=''
+                for consName,consSeq,consQ in mappy.fastx_read(f'{poa_output}'):
+                    cons_seq=consSeq
+                if cons_seq:
+                    consensus_sequence = cons_seq
+                    type1='poa'
+                else:
                     print('abpoa not successful for',UMI,' - falling back on best R2C2 read',' '*20,end='\r')
                     consensus_sequence = best
-                else:
-                    consensus_sequence = res.cons_seq[0]
-                    type1='poa'
+
+
+
+
         out_cons_file = open(poa_cons, 'w')
-        out_cons_file.write('>Consensus\n' + consensus_sequence + '\n')
+        out_cons_file.write(f'>Consensus\n{consensus_sequence}\n')
         out_cons_file.close()
 
 
@@ -363,15 +387,10 @@ def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka):
         mm_align = mappy.Aligner(seq=temp_cons_reads['Consensus'], preset='map-ont')
         for name,sequence,q in fastq_reads:
             for hit in mm_align.map(sequence):
-                overlap_fh.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
-                    name, str(len(sequence)), hit.q_st, hit.q_en,
-                    hit.strand, 'Consensus', hit.ctg_len, hit.r_st,
-                    hit.r_en, hit.mlen, hit.blen, hit.mapq))
+                overlap_fh.write(f'{name}\t{str(len(sequence))}\t{hit.q_st}\t{hit.q_en}\t{hit.strand}\tConsensus\t{hit.ctg_len}\t{hit.r_st}\t{hit.r_en}\t{hit.mlen}\t{hit.blen}\t{hit.mapq}\n')
 
         overlap_fh.close()
-        os.system('%s -q 5 -t 1 --no-trimming\
-                   %s %s %s >%s 2>./racon_messages.txt' \
-                   %(racon,out_Fq, overlap, poa_cons, output_cons))
+        os.system(f'{racon} -q 5 -t 1 --no-trimming {out_Fq} {overlap} {poa_cons} > {output_cons} 2>./racon_messages.txt')
 
         final=output_cons
         reads = read_fasta(final)
@@ -397,17 +416,17 @@ def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka):
             temp_files.append(medakaFasta)
 
             if medaka:
-                os.system('minimap2 -ax map-ont --secondary=no -t 1 %s %s >%s 2> ./minimap2.messages' % (final,out_Fq,sub2draftSAM))
-                os.system('samtools view -b %s > %s'% (sub2draftSAM,sub2draftBAM))
-                os.system('samtools sort %s > %s' % (sub2draftBAM,sub2draftBAMsorted))
-                os.system('samtools index %s' % (sub2draftBAMsorted))
-                os.system('medaka consensus %s %s --model r1041_e82_400bps_sup_v4.0.0 2>medaka_errors.txt > medaka_messages.txt' %(sub2draftBAMsorted,medakaHDF))
-                os.system('medaka stitch %s %s %s 2>medaka_stitch.errors >medaka_stitch.txt' % (medakaHDF,final, medakaFasta ))
+                os.system(f'minimap2 -ax map-ont --secondary=no -t 1 {final} {out_Fq} >{sub2draftSAM} 2> ./minimap2.messages')
+                os.system(f'samtools view -b {sub2draftSAM} >{sub2draftBAM}')
+                os.system(f'samtools sort {sub2draftBAM} >{sub2draftBAMsorted}')
+                os.system(f'samtools index {sub2draftBAMsorted}')
+                os.system(f'medaka consensus {sub2draftBAMsorted} {medakaHDF} --model r1041_e82_400bps_sup_v4.0.0 2>medaka_errors.txt > medaka_messages.txt')
+                os.system(f'medaka stitch {medakaHDF} {final} {medakaFasta} 2>medaka_stitch.errors >medaka_stitch.txt')
                 final=medakaFasta
                 reads=read_fasta(final)
                 if len(reads)==0:
                     fastq_count+=1
-                    print('medaka not successful for',UMI,' - falling back on racon consensus',' '*20,end='\r')
+                    print('medaka not successful for {UMI} - falling back on racon consensus',' '*20,end='\r')
                     reads = read_fasta(output_cons)
                 else:
                     type1='medaka'
@@ -423,7 +442,7 @@ def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka):
         mean_acc=np.mean(accuracies)
     else:
         mean_acc=0
- #   print('finished UMI',UMI,mean_acc,' '*60,end='\r')
+    print(f'finished UMI {UMI} covered by {consensusCoverage} R2C2 reads, {batch_UMI_counter} of {batch_UMI_total} {round((batch_UMI_counter/batch_UMI_total)*100,2)}%',' '*60,end='\r')
     return main_name,corrected_consensus,str(len(og_reads)),str(len(fastq_reads)),type1,mean_acc
 
 
@@ -434,16 +453,19 @@ def read_cons(fasta_file):
         ConsDict[root]=(name,seq,q)
     return ConsDict
 
-def process_batch(subreads,reads,counter,processed,singles,subsample,medaka,threads,out,fasta_file,combined_UMI_length):
+def process_batch(subreads,reads,counter,processed,singles,subsample,medaka,threads,out,fasta_file,combined_UMI_length,abpoa,racon):
     results={}
     results1={}
     temp='./tmp'+fasta_file.split('.')[0]
     if not os.path.isdir(temp):
         os.system('mkdir '+temp)
     pool = mp.Pool(processes=threads)
-    print(f'making consensus sequences in parallel for the next {len(reads)} UMIs', ' '*60)
+    batch_UMI_total = len(reads)
+    batch_UMI_counter = 0
+    print(f'making consensus sequences in parallel for the next {batch_UMI_total} UMIs', ' '*60)
     for temp_UMI,temp_reads in reads.items():
         temp_reads=list(temp_reads)
+        batch_UMI_counter += 1
         UMIseq=temp_reads[0][3]
         if temp_UMI in subreads:
             temp_subreads=list(subreads[temp_UMI])
@@ -451,7 +473,7 @@ def process_batch(subreads,reads,counter,processed,singles,subsample,medaka,thre
             temp_subreads=[]
         if len(temp_reads)>1 and len(UMIseq)==combined_UMI_length:
 #            print('submitting UMI',temp_UMI,'with',len(temp_reads),'consensus reads and',len(temp_subreads),'total subreads',' '*20, end='\r')
-            results[temp_UMI]=pool.apply_async(determine_consensus,[temp_UMI,temp_reads,temp_subreads,temp,subsample,medaka])
+            results[temp_UMI]=pool.apply_async(determine_consensus,[temp_UMI,temp_reads,temp_subreads,temp,subsample,medaka,abpoa,racon,batch_UMI_counter,batch_UMI_total])
         else:
             counter=1
             for temp_read in temp_reads:
@@ -469,41 +491,47 @@ def process_batch(subreads,reads,counter,processed,singles,subsample,medaka,thre
         out.write('>%s\n%s\n' % (consName,consSeq))
     return(processed+len(results),singles+len(results1))
 
-def delegating_consensus_generation(fasta_file,umi_file,subread_file,subsample,medaka,combined_UMI_length,threads,batch,out):
+def delegating_consensus_generation(fasta_file,umi_file,subread_file,subsample,medaka,combined_UMI_length,threads,batch,out,abpoa,racon):
     target=batch
     subsample=subsample
     pool = mp.Pool(processes=threads)
     print('reading UMI file')
     UMIdict=read_UMI(umi_file)
     totalUMIs=len(UMIdict)
-    print(f'there are {len(UMIdict} UMIs in total')
+    print(f'there are {len(UMIdict)} UMIs in total')
     print('reading consensus reads')
     ConsDict=read_cons(fasta_file)
     counter,processed,singles,reads,subreads=0,0,0,{},{}
     print('partioning reads for multiprocessing')
+    lastUMI=''
+    done=set()
     for line in open(subread_file):
         a=line.strip().split('\t')
         counter+=1
         name,seq,qual = a[2],a[3],a[4]
         UMInumber=a[0]
         UMI=a[1]
-        if UMInumber not in subreads:
+        print(f'collected {counter} subreads of ~{batch} subreads for this batch',' '*60,end='\r')
+        if UMInumber != lastUMI:
             if counter>target:
                 print(f'\ncollected {counter} subreads covering {len(subreads)} UMIs', ' '*60)
-                processed,singles=process_batch(subreads,reads,counter,processed,singles,subsample,medaka,threads,out,fasta_file,combined_UMI_length)
+                processed,singles=process_batch(subreads,reads,counter,processed,singles,subsample,medaka,threads,out,fasta_file,combined_UMI_length,abpoa,racon)
                 print(f'{processed} reads merged from multi-read UMIs, {singles} reads not merged because incomplete or single-read UMI', ' '*60)
                 subreads={}
                 reads={}
                 counter=0
             subreads[UMInumber]=set()
             reads[UMInumber]=set()
-        rootNames=UMIdict[UMI]
-        for rootName in rootNames:
-            n,s,q = ConsDict[rootName]
-            reads[UMInumber].add((n,s,q,UMI))
+            lastUMI=UMInumber
+        if UMI not in done:
+            done.add(UMI)
+            rootNames=UMIdict[UMI]
+            for rootName in rootNames:
+                n,s,q = ConsDict[rootName]
+                reads[UMInumber].add((n,s,q,UMI))
         subreads[UMInumber].add((name,seq,qual))
 
-    processed,singles=process_batch(subreads,reads,counter,processed,singles,subsample,medaka,threads,out,fasta_file,combined_UMI_length)
+    processed,singles=process_batch(subreads,reads,counter,processed,singles,subsample,medaka,threads,out,fasta_file,combined_UMI_length,abpoa,racon)
     print(f'{processed} reads merged from multi-read UMIs, {singles} reads not merged because incomplete or single-read UMI', ' '*60)
 
 
