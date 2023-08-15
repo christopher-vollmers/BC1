@@ -1,3 +1,7 @@
+[![Github release](https://img.shields.io/github/tag/christopher-vollmers/BC1-1.svg?label=Version)](https://github.com/christopher-vollmers/BC1-1/tags)
+[![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
+
+
 # BC1
 Create consensus reads from UMI labeled long-reads
 
