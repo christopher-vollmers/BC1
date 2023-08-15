@@ -3,16 +3,16 @@ Create consensus reads from UMI labeled long-reads
 
 ###Quickstart
 
-'''bash
+```bash
 
 sh setup.sh
 
 python3 bc1.py -i 16S_C3POa.fasta -o 16S.BC1_consensus -s R2C2_Subreads.fastq -f -t 60 -u 5.38:50.ACAG.BDHVBDHVBDHV.AG,3.38:50.ACAG.BDHVBDHVBDHV.CG
 
-'''
+```
 
 
-'''bash
+```bash
 
   -i INPUT_FASTA, --input_fasta 
                         demultiplexed,trimmed, and reoriented R2C2 consensus reads as output by C3POa_postprocessing.py
@@ -35,7 +35,7 @@ python3 bc1.py -i 16S_C3POa.fasta -o 16S.BC1_consensus -s R2C2_Subreads.fastq -f
                         read and is flanked on the left with 'GACAG' and is 14nt long. The second at the 3prime end of the read starting somewhere in the first 3 bases of the (reverse complemented) read and is flanked on the left with 'CAC' and on
                         the right with 'TTTT' and is 6nt long. IUPAC wild card bares can be used at any position
 
-'''
+```
 
 
 
