@@ -1,7 +1,7 @@
 # BC1
 Create consensus reads from UMI labeled long-reads
 
-##Setuo##
+## Setup ##
 
 ```bash
 
@@ -9,13 +9,15 @@ sh setup.sh
 
 ```
 
-##Short example##
+## Short example ##
 
 ```bash
 
 python3 bc1.py -i 16S_C3POa.fasta -o 16S.BC1_consensus -s R2C2_Subreads.fastq -f -t 60 -u 5.38:50.ACAG.BDHVBDHVBDHV.AG,3.38:50.ACAG.BDHVBDHVBDHV.CG
 
 ```
+
+## Run options ##
 
 
 ```bash
