@@ -1,4 +1,4 @@
-[![Github release](https://img.shields.io/github/tag/christopher-vollmers/BC1-1.svg?label=Version)](https://github.com/christopher-vollmers/BC1-1/tags)
+[![Github release](https://img.shields.io/github/tag/christopher-vollmers/BC1.svg?label=Version)](https://github.com/christopher-vollmers/BC1/tags)
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
 
 
