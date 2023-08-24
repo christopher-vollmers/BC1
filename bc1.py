@@ -55,7 +55,7 @@ def main():
     else:
         print('extracting UMIs from', input_reads)
         UMIdict,combined_UMI_length = extracting_UMIs(input_reads,output_file_root,UMIpatterns)
-    combined_UMI_length = 25
+#    combined_UMI_length = 25
     print('combined UMI pattern length',combined_UMI_length)
     print('labeling and sorting subreads in', subread_file, '(this can take a while)')
     create_labeled_subreads(UMIdict,subread_file,output_file_root+'.subreads')
