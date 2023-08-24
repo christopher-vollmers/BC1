@@ -54,22 +54,22 @@ def main():
         UMIdict,combined_UMI_length = extracting_UMIs_STARsolo(STARsolo,output_file_root,UMIpatterns)
     else:
         print('extracting UMIs from', input_reads)
-#        UMIdict,combined_UMI_length = extracting_UMIs(input_reads,output_file_root,UMIpatterns)
+        UMIdict,combined_UMI_length = extracting_UMIs(input_reads,output_file_root,UMIpatterns)
     combined_UMI_length = 25
     print('combined UMI pattern length',combined_UMI_length)
     print('labeling and sorting subreads in', subread_file, '(this can take a while)')
-#    create_labeled_subreads(UMIdict,subread_file,output_file_root+'.subreads')
+    create_labeled_subreads(UMIdict,subread_file,output_file_root+'.subreads')
     print('UMI collecting indexes')
     toSort=f'{output_file_root}.subreads'
     if fuzzy:
-#        all_indexes,first_indexes,second_indexes = collect_indexes(output_file_root+'.subreads')
+        all_indexes,first_indexes,second_indexes = collect_indexes(output_file_root+'.subreads')
         print('combine similar UMIs and their Indexes')
-#        equivalent_indexes,chimeras = find_fuzzy_matches(all_indexes,first_indexes,second_indexes)
+        equivalent_indexes,chimeras = find_fuzzy_matches(all_indexes,first_indexes,second_indexes)
         print('writing and sorting subreads')
-#        write_new_indexes(output_file_root+'.subreads',equivalent_indexes)
+        write_new_indexes(output_file_root+'.subreads',equivalent_indexes)
 #        write_chimeras(output_file_root+'.chimeras',chimeras)
         toSort=f'{output_file_root}.subreads.fuzzy'
-#    os.system(f'sort --parallel {threads} -k1,1n -k2,2n -T ./ {toSort} > {output_file_root}.subreads.sorted')
+    os.system(f'sort --parallel {threads} -k1,1n -k2,2n -T ./ {toSort} > {output_file_root}.subreads.sorted')
     out=open(output_file_root+'.merged.fasta','w')
     delegating_consensus_generation(input_reads,output_file_root+'.UMIs',output_file_root+'.subreads.sorted',subsample,medaka,combined_UMI_length,threads,1000000,out,abpoa,racon)
 
