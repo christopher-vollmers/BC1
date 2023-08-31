@@ -8,6 +8,43 @@ import os
 
 
 
+def split_reads(sorted_subread_file,consensus_read_file,umi_file,target):
+    print('splitting reads')
+    done=set()
+    counter=0
+    subcounter=0
+    lastUMI='-1'
+    UMIdict=read_UMI(umi_file)
+    ConsDict=read_cons(consensus_read_file)
+    print('number of consensus read', len(ConsDict))
+    out=open(f'{sorted_subread_file}.split.{subcounter}','w')
+    print(sorted_subread_file)
+    for line in open(sorted_subread_file):
+        a=line.strip().split('\t')
+        counter+=1
+        name,seq,qual = a[2],a[3],a[4]
+        UMInumber=a[0]
+        UMI=a[1]
+        if UMInumber != lastUMI:
+            if counter>target:
+                out.close()
+                print(f'starting split file {sorted_subread_file}.split.{subcounter}')
+                out=open(f'{sorted_subread_file}.split.{subcounter}','w')
+                counter=0
+                subcounter+=1
+            lastUMI=UMInumber
+        out.write(f'sub\t{UMInumber}\t{UMI}\t{name}\t{seq}\t{qual}\n')
+        if UMI not in done:
+            done.add(UMI)
+            rootNames=UMIdict[UMI]
+            for rootName in rootNames:
+                n,s,q = ConsDict[rootName]
+                out.write(f'cons\t{UMInumber}\t{UMI}\t{n}\t{s}\t{q}\n')
+
+    out.close()
+
+
+
 def create_labeled_subreads(UMIdict,subread_files,out2):
     outSub=open(out2,'w')
     for subread_file in subread_files.split(','):
@@ -115,11 +152,7 @@ def extracting_UMIs(input_reads,output_file_root,UMIpatterns):
         UMIdict[root]=(UMI,UMInumbers[UMI])
 
     print(reasonDict.items())
-    combined_umi_length=0
-    for UMIpattern in UMIpatterns.split(','):
-        combined_umi_length+=len(UMIpattern.split('.')[3])
-    combined_umi_length+=(len(UMIpatterns.split(','))-1)
-    return UMIdict,combined_umi_length
+    return UMIdict
 
 
 def extracting_UMIs_STARsolo(input_sam,output_file_root,UMIpatterns):
@@ -453,10 +486,10 @@ def read_cons(fasta_file):
         ConsDict[root]=(name,seq,q)
     return ConsDict
 
-def process_batch(subreads,reads,counter,processed,singles,subsample,medaka,threads,out,fasta_file,combined_UMI_length,abpoa,racon):
+def process_batch(subreads,reads,processed,singles,subsample,medaka,threads,out,combined_UMI_length,abpoa,racon,temp_folder):
     results={}
     results1={}
-    temp='./tmp'+fasta_file.split('.')[0]
+    temp=f'{temp_folder}/tmp'
     if not os.path.isdir(temp):
         os.system('mkdir '+temp)
     pool = mp.Pool(processes=threads)
@@ -485,16 +518,18 @@ def process_batch(subreads,reads,counter,processed,singles,subsample,medaka,thre
     gc.collect()
     for temp_UMI,result in results.items():
         consName,consSeq,readNumber,subreadNumber,type1,accuracies = result.get()
-        out.write('>%s_%s_%s_%s_%s_%s\n%s\n' % (consName,readNumber,subreadNumber,temp_UMI,str(round(accuracies,3)),type1,consSeq))
+        out.write('>%s_%s_%s_%s_%s|%s\n%s\n' % (consName,readNumber,subreadNumber,str(round(accuracies,3)),type1,temp_UMI,consSeq))
     for temp_UMI,result in results1.items():
         consName,consSeq = result
-        out.write('>%s\n%s\n' % (consName,consSeq))
+        out.write('>%s|%s\n%s\n' % (consName,temp_UMI,consSeq))
     return(processed+len(results),singles+len(results1))
 
-def delegating_consensus_generation(fasta_file,umi_file,subread_file,subsample,medaka,combined_UMI_length,threads,batch,out,abpoa,racon):
+def delegating_consensus_generation(fasta_file,output_file_root,subsample,medaka,combined_UMI_length,threads,batch,out,abpoa,racon,resume):
+    output_file=output_file_root+'.merged.fasta'
+    umi_file=output_file_root+'.UMIs',
+    subread_file=output_file_root+'.subreads.sorted'
     target=batch
     subsample=subsample
-    pool = mp.Pool(processes=threads)
     print('reading UMI file')
     UMIdict=read_UMI(umi_file)
     totalUMIs=len(UMIdict)
@@ -503,6 +538,13 @@ def delegating_consensus_generation(fasta_file,umi_file,subread_file,subsample,m
     ConsDict=read_cons(fasta_file)
     counter,processed,singles,reads,subreads=0,0,0,{},{}
     print('partioning reads for multiprocessing')
+    already=set()
+    if resume:
+        for name,seq,q in mappy.fastx_read(output_file_root+'.merged.fasta'):
+            already.add(name.split('|')[1])
+        out=open(output_file,'a')
+    else:
+        out=open(output_file,'w')
     lastUMI=''
     done=set()
     for line in open(subread_file):
@@ -512,24 +554,25 @@ def delegating_consensus_generation(fasta_file,umi_file,subread_file,subsample,m
         UMInumber=a[0]
         UMI=a[1]
         print(f'collected {counter} subreads of ~{batch} subreads for this batch',' '*60,end='\r')
-        if UMInumber != lastUMI:
-            if counter>target:
-                print(f'\ncollected {counter} subreads covering {len(subreads)} UMIs', ' '*60)
-                processed,singles=process_batch(subreads,reads,counter,processed,singles,subsample,medaka,threads,out,fasta_file,combined_UMI_length,abpoa,racon)
-                print(f'{processed} reads merged from multi-read UMIs, {singles} reads not merged because incomplete or single-read UMI', ' '*60)
-                subreads={}
-                reads={}
-                counter=0
-            subreads[UMInumber]=set()
-            reads[UMInumber]=set()
-            lastUMI=UMInumber
-        if UMI not in done:
-            done.add(UMI)
-            rootNames=UMIdict[UMI]
-            for rootName in rootNames:
-                n,s,q = ConsDict[rootName]
-                reads[UMInumber].add((n,s,q,UMI))
-        subreads[UMInumber].add((name,seq,qual))
+        if UMInumber not in already:
+            if UMInumber != lastUMI:
+                if counter>target:
+                    print(f'\ncollected {counter} subreads covering {len(subreads)} UMIs', ' '*60)
+                    processed,singles=process_batch(subreads,reads,counter,processed,singles,subsample,medaka,threads,out,fasta_file,combined_UMI_length,abpoa,racon)
+                    print(f'{processed} reads merged from multi-read UMIs, {singles} reads not merged because incomplete or single-read UMI', ' '*60)
+                    subreads={}
+                    reads={}
+                    counter=0
+                subreads[UMInumber]=set()
+                reads[UMInumber]=set()
+                lastUMI=UMInumber
+            if UMI not in done:
+                done.add(UMI)
+                rootNames=UMIdict[UMI]
+                for rootName in rootNames:
+                    n,s,q = ConsDict[rootName]
+                    reads[UMInumber].add((n,s,q,UMI))
+            subreads[UMInumber].add((name,seq,qual))
 
     processed,singles=process_batch(subreads,reads,counter,processed,singles,subsample,medaka,threads,out,fasta_file,combined_UMI_length,abpoa,racon)
     print(f'{processed} reads merged from multi-read UMIs, {singles} reads not merged because incomplete or single-read UMI', ' '*60)
