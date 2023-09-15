@@ -8,6 +8,8 @@ BC1 will take UMI-containing R2C2 consensus reads and their subreads as input to
 
 ## Setup ##
 
+You'll need minimap2 and samtools installed in your path. Everything else should be installed with the setup script. 
+
 ```bash
 
 sh setup.sh
