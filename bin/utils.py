@@ -28,10 +28,10 @@ def split_reads(sorted_subread_file,consensus_read_file,umi_file,target):
         if UMInumber != lastUMI:
             if counter>target:
                 out.close()
+                subcounter+=1
                 print(f'starting split file {sorted_subread_file}.split.{subcounter}')
                 out=open(f'{sorted_subread_file}.split.{subcounter}','w')
                 counter=0
-                subcounter+=1
             lastUMI=UMInumber
         out.write(f'sub\t{UMInumber}\t{UMI}\t{name}\t{seq}\t{qual}\n')
         if UMI not in done:
@@ -302,7 +302,7 @@ def read_UMI(umi_file):
         UMIdict[UMI].append(name_root)
     return UMIdict
 
-def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka,abpoa,racon,batch_UMI_counter,batch_UMI_total):
+def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka,abpoa,racon,minimap2,batch_UMI_counter,batch_UMI_total):
     '''Aligns and returns the consensus'''
     type1='best'
     corrected_consensus = ''
@@ -449,7 +449,7 @@ def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka,abpoa
             temp_files.append(medakaFasta)
 
             if medaka:
-                os.system(f'minimap2 -ax map-ont --secondary=no -t 1 {final} {out_Fq} >{sub2draftSAM} 2> ./minimap2.messages')
+                os.system(f'{minimap2} -ax map-ont --secondary=no -t 1 {final} {out_Fq} >{sub2draftSAM} 2> ./minimap2.messages')
                 os.system(f'samtools view -b {sub2draftSAM} >{sub2draftBAM}')
                 os.system(f'samtools sort {sub2draftBAM} >{sub2draftBAMsorted}')
                 os.system(f'samtools index {sub2draftBAMsorted}')
@@ -486,7 +486,7 @@ def read_cons(fasta_file):
         ConsDict[root]=(name,seq,q)
     return ConsDict
 
-def process_batch(subreads,reads,processed,singles,subsample,medaka,threads,out,combined_UMI_length,abpoa,racon,temp_folder):
+def process_batch(subreads,reads,processed,singles,subsample,medaka,threads,out,combined_UMI_length,abpoa,racon,minimap2,temp_folder):
     results={}
     results1={}
     temp=f'{temp_folder}/tmp'
@@ -506,7 +506,7 @@ def process_batch(subreads,reads,processed,singles,subsample,medaka,threads,out,
             temp_subreads=[]
         if len(temp_reads)>1 and len(UMIseq)==combined_UMI_length:
 #            print('submitting UMI',temp_UMI,'with',len(temp_reads),'consensus reads and',len(temp_subreads),'total subreads',' '*20, end='\r')
-            results[temp_UMI]=pool.apply_async(determine_consensus,[temp_UMI,temp_reads,temp_subreads,temp,subsample,medaka,abpoa,racon,batch_UMI_counter,batch_UMI_total])
+            results[temp_UMI]=pool.apply_async(determine_consensus,[temp_UMI,temp_reads,temp_subreads,temp,subsample,medaka,abpoa,racon,minimap2,batch_UMI_counter,batch_UMI_total])
         else:
             counter=1
             for temp_read in temp_reads:
