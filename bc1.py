@@ -14,7 +14,7 @@ sys.path.append(os.path.abspath(PATH))
 BD1Path = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 abpoa=BD1Path+'/abPOA-v1.4.1/bin/abpoa'
 racon=BD1Path+'/racon/build/bin/racon'
-
+minimap2=BD1Path+'/minimap2/minimap2'
 
 VERSION = "v0.95 - The readings are off the charts. Over Q50. Even Master Yoda doesn't have a Midi-chlorian count that high"
 
@@ -45,8 +45,12 @@ output_path=os.path.abspath(args.output_path)
 input_reads = os.path.abspath(args.input_fasta)
 subread_file_prelim=args.subread_files
 subreads=[]
-for subread_files in subread_file_prelim.split(','):
-    subreads.append(os.path.abspath(subread_files))
+if subread_file_prelim:
+    for subread_files in subread_file_prelim.split(','):
+        subreads.append(os.path.abspath(subread_files))
+else:
+    print('no subreads provided. Will use regular input reads for error correction') 
+    subreads.append(input_reads)
 subread_file=(',').join(subreads)
 
 threads=args.threads
