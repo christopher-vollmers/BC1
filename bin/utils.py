@@ -296,7 +296,7 @@ def read_UMI(umi_file):
         if len(a)==2:
             UMI=a[1]
         else:
-            UMI='_'
+            UMI=''
         if UMI not in UMIdict:
             UMIdict[UMI]=[]
         UMIdict[UMI].append(name_root)
@@ -350,12 +350,24 @@ def determine_consensus(UMI,reads,fastq_reads,temp_folder,subsample,medaka,abpoa
             first=sequence
             info=read.split('_')
             names.append(info[0])
-            coverage=int(info[3])
-            qual.append(float(info[1]))
-            raw.append(int(info[2]))
-            repeats+=int(info[3])
-            before.append(int(info[4]))
-            after.append(int(info[5].split('|')[0]))
+            if len(info)>1:
+                coverage=int(info[3])
+                qual.append(float(info[1]))
+                raw.append(int(info[2]))
+                repeats+=int(info[3])
+                before.append(int(info[4]))
+                after.append(int(info[5].split('|')[0]))
+            else:
+                coverage=1
+                numbers=[]
+                for Q in q:
+                    numbers.append(ord(Q)-33)
+                qual.append(round(np.average(numbers),1))
+                raw.append(len(sequence))
+                repeats+=1
+                before.append(len(sequence))
+                after.append(len(sequence))
+
             if coverage>=max_coverage:
                 best=sequence
                 best_name=read
