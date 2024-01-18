@@ -7,6 +7,12 @@ cwd=$(pwd)
 echo 'Pip installables (scipy, numpy, mappy, Cython)'
 python3 -m pip install --user --upgrade scipy numpy mappy Cython editdistance
 
+
+echo "minimap2"
+git clone https://github.com/lh3/minimap2
+cd minimap2 && make
+cd $cwd
+
 echo 'Racon'
 git clone --recursive https://github.com/isovic/racon.git racon
 cd racon
