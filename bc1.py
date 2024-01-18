@@ -49,7 +49,7 @@ if subread_file_prelim:
     for subread_files in subread_file_prelim.split(','):
         subreads.append(os.path.abspath(subread_files))
 else:
-    print('no subreads provided. Will use regular input reads for error correction') 
+    print('no subreads provided. Will use regular input reads for error correction. Input reads have to be fastq in this case.') 
     subreads.append(input_reads)
 subread_file=(',').join(subreads)
 
