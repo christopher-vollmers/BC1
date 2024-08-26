@@ -400,7 +400,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gonk_power"
+name = "gnk_power"
 version = "0.1.0"
 dependencies = [
  "needletail",
