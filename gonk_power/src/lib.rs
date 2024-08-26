@@ -123,7 +123,7 @@ fn median(numbers: &[i32]) -> f32 {
 }
 
 #[pymodule]
-fn rust_tools(py: Python, m: &PyModule) -> PyResult<()> {
+fn gonk_power(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(create_labeled_subreads, m)?)?;
     m.add_function(wrap_pyfunction!(extracting_umis_starsolo, m)?)?;
     Ok(())
