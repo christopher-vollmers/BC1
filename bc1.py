@@ -19,7 +19,7 @@ minimap2=BD1Path+'/minimap2/minimap2'
 VERSION = "v0.95 - The readings are off the charts. Over Q50. Even Master Yoda doesn't have a Midi-chlorian count that high"
 
 from utils import extracting_UMIs,extracting_UMIs_STARsolo,create_labeled_subreads,collect_indexes,find_fuzzy_matches,write_new_indexes,read_fasta,findUMISequence,read_fasta_root
-from utils import delegating_consensus_generation, process_batch, determine_consensus,read_cons,write_chimeras,split_reads
+from utils import delegating_consensus_generation, process_batch, determine_consensus,read_cons,write_chimeras,split_reads, write_labeled_cons_reads
 
 
 parser=argparse.ArgumentParser()
@@ -30,7 +30,7 @@ parser.add_argument('-r','--resume',action='store_true',default=False, help='if 
 parser.add_argument('-s','--subread_files',type=str, help='R2C2 subreads as output by C3POa. Can be multiple comma separated files')
 parser.add_argument('-m','--medaka',action='store_true',default=False, help='if set, medaka will be run. required for highest accuracy but definitely slows things down. assumes data was produced with R10.4 pores at 400bp/s speed')
 parser.add_argument('-f','--fuzzy',action='store_true',default=False, help='if set, reads with a single mismatch between their UMIs will be combined. By default, only reads with identical UMIs will be combined.')
-#parser.add_argument('-S','--STARsolo_sam_file',type=str, help='experimental setting.Probably best left alone for now')
+parser.add_argument('-S','--STARsolo_sam_file',type=str, help='experimental setting.Probably best left alone for now')
 parser.add_argument('-b','--subsample',type=int,default=1000,help='subreads will be subsampled to this number.' )
 parser.add_argument('-t', '--threads', type=int, help='defines the number of threads the multiprocessing will use')
 parser.add_argument('-u','--UMIpatterns',type=str, help="""UMI patterns separated by commas. \nAn example would be '5.0:3.GACAG.NNNNNNNNNNNNNN.,3.0:3.CAC.NNNNNN.TTTT' that would indicate two UMIs.
@@ -64,9 +64,12 @@ resume=args.resume
 
 UMIpatterns=args.UMIpatterns
 combined_umi_length=0
-for UMIpattern in UMIpatterns.split(','):
-    combined_umi_length+=len(UMIpattern.split('.')[3])
-combined_umi_length+=(len(UMIpatterns.split(','))-1)
+if input_sam:
+    combined_umi_length=0 #set later when creating UMIdict
+else:
+    for UMIpattern in UMIpatterns.split(','):
+        combined_umi_length+=len(UMIpattern.split('.')[3])
+    combined_umi_length+=(len(UMIpatterns.split(','))-1)
 
 def main():
 
@@ -118,7 +121,14 @@ def main():
     logfile_object.flush()
     if not labeledSubreads:
         print('extracting UMIs from', input_reads)
-        UMIdict = extracting_UMIs(input_reads,f'{output_path}/tmp/{output_file_root}',UMIpatterns)
+        if input_sam:
+            UMIdict,combined_umi_length = extracting_UMIs_STARsolo(input_sam,f'{output_path}/tmp/{output_file_root}',UMIpatterns)
+            #UMIdict,combined_umi_length = rust_tools.extracting_umis_starsolo(input_sam,f'{output_path}/tmp/{output_file_root}',UMIpatterns)
+            print('combined_umi_length:',combined_umi_length)
+        else:
+           UMIdict = extracting_UMIs(input_reads,f'{output_path}/tmp/{output_file_root}',UMIpatterns)
+        print('writing out labeled consensus reads')
+        write_labeled_cons_reads(UMIdict,input_reads,f'{output_path}/tmp/{output_file_root}.subreads',f'{output_path}/tmp/{output_file_root}')
         logfile_object.write(f'extracted UMIs\t{output_path}\t{output_file_root}\t{input_reads}\t{subread_file}\t{UMIpatterns}\t{fuzzy}\t{medaka}\t{subsample}\n')
         logfile_object.flush()
         print('labeling subreads in', subread_file, '(this can take a while)')
@@ -144,7 +154,7 @@ def main():
         logfile_object.write(f'sorted subreads\t{output_path}\t{output_file_root}\t{input_reads}\t{subread_file}\t{UMIpatterns}\t{fuzzy}\t{medaka}\t{subsample}\n')
         logfile_object.flush()
     if not splitSubreads:
-         split_reads(f'{output_path}/tmp/{output_file_root}.subreads.sorted',input_reads,f'{output_path}/tmp/{output_file_root}.UMIs',1000000)
+         split_reads(f'{output_path}/tmp/{output_file_root}.subreads.sorted',1000000)
          logfile_object.write(f'split subreads\t{output_path}\t{output_file_root}\t{input_reads}\t{subread_file}\t{UMIpatterns}\t{fuzzy}\t{medaka}\t{subsample}\n')
          logfile_object.flush()
 
