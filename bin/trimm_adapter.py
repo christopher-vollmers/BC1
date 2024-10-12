@@ -1,13 +1,31 @@
 import sys
 import mappy
 import editdistance
+import argparse
 
-primers=sys.argv[1]
-consensus_reads=sys.argv[2]
-out=open(sys.argv[3],'w')
+parser = argparse.ArgumentParser()
 
-leftUMIlength=58
-rightUMIlength=58
+parser.add_argument('--primers', '-p', type=str, action='store', help='fasta file containing adapter sequences')
+parser.add_argument('--reads', '-r', type=str, action='store', help='fasta/q file containing reads to be adapter trimmed')
+parser.add_argument('--outputfile', '-o', type=str, action='store', help='name of output file')
+parser.add_argument('--starts', '-s', type=str, action='store', help='what 5prime and 3prime position to start looking for adapter sequences. two numbers, comma separated')
+
+
+if len(sys.argv) == 1:
+    parser.print_help()
+    sys.exit(0)
+args = parser.parse_args()
+consensus_reads = args.reads
+outFile = args.outputfile
+primers=args.primers
+out=open(outFile,'w')
+starts=args.starts
+
+
+leftUMIlength,rightUMIlength=starts.split(',')
+leftUMIlength=int(leftUMIlength)
+rightUMIlength=int(rightUMIlength)
+
 
 IUPACdict={}
 IUPACdict['A']=['A']
@@ -34,17 +52,13 @@ for name,seq,q in mappy.fastx_read(primers):
     seqs=['']
     for base in seq:
         newSeqs=[]
-        print(IUPACdict[base])
         for unambigousBase in IUPACdict[base]:
-            print(unambigousBase)
             for unambigousSeq in seqs:
                 newSeqs.append(unambigousSeq+unambigousBase)
         seqs=newSeqs
-        print(seqs)
     for seq in seqs:
         primerDict[name].append(seq)
 
-print(primerDict)
 
 
 for name,seq,q in mappy.fastx_read(consensus_reads):
