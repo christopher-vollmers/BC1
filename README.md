@@ -23,11 +23,10 @@ So, whether you have amplicon data, RNA-seq data, fl-cDNA data, or any other typ
 
 BC1 uses 
 
-[abpoa](https://github.com/yangao07/abPOA) to make a preliminary multi sequence alignment and consensus read
+[abpoa](https://github.com/yangao07/abPOA) to make a preliminary multi sequence alignment and consensus read.
 [racon](https://github.com/isovic/racon) to polish that consensus read with subreads (if provided) or input reads
-
 and optionally
-[medaka](https://github.com/nanoporetech/medaka) to extra polish (slowly) the polished consensus read with subreads (if provided) or input reads
+[medaka](https://github.com/nanoporetech/medaka) to extra polish (slowly) the polished consensus read with subreads (if provided) or input reads.
  
 Running medaka to polish the output for highest accuracy only makes sense if the data is from ONT sequencers. For now, the pore/chemistry is hardcoded for R10.4/LSK114. It can be change in the code and we plan to ultimately have a flag to set it.
  
