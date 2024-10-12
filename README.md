@@ -5,6 +5,24 @@
 # BC1
 Create consensus reads from UMI labeled long-reads.
 BC1 will take UMI-containing R2C2 consensus reads and their subreads as input to generate highly accurate R2C2+UMI reads. 
+BC1 can also take regular ONT reads fastqs as input (-i). In that case, just omit the subreads flag (-s)
+
+## Background ##
+
+BC1 grew from a collection of tools for our work on single cell full-length cDNA sequencing using 10X in this [paper](https://doi.org/10.1186/s13059-022-02615-z)
+Then we compiled it into a tool for our work on ultra-accurate amplicon sequencing in this [paper](https://doi.org/10.1093/pnasnexus/pgae336)
+
+For both papers, we had sequencing reads that contained UMIs and we wanted to combine reads based on those UMIs into more accurate consensus reads. 
+To be able to work with 10x fl-cDNA and Illumina style dual UMI amplicons libraries we designed a straightforward syntax for the parsing of all (most?) UMIs.
+
+We designed BC1 to scale with ever increasing read numbers in long-read sequencing studies. 
+While we use it mostly with ONT-based R2C2 data, it can be used on regular ONT reads and PacBio CCS reads. In both of those cases, subreads should not be submitted. In the ONT case because there are no subreads.
+In the PacBio case because the subreads naming scheme hasn't been implemented in BC1 yet. Mostly though, PacBio subread files are enormous and therefore take forever to parse.
+
+So, whether you have amplicon data, RNA-seq data, fl-cDNA data, or any other type of single read data (doesn't even have to be long-read data)
+
+Running medaka to polish the output for highest accuracy only makes sense if the data is from ONT sequencers. For now, the pore/chemistry is hardcoded for R10.4/LSK114. It can be change in the code and we plan to ultimately have a flag to set it.
+ 
 
 ## Setup ##
 
@@ -18,11 +36,63 @@ sh setup.sh
 
 ## Short example ##
 
+
+
+Dual UMI amplicons that aren't trimmed and therefore have their UMI fat (38nt+) into the read. -f allows one mismatch in the UMIs :
+
 ```bash
 
-python3 bc1.py -p ./ -i 16S_C3POa.fasta -o 16S.BC1_consensus -s R2C2_Subreads.fastq -f -t 60 -u 5.38:50.ACAG.BDHVBDHVBDHV.AG,3.38:50.ACAG.BDHVBDHVBDHV.CG
+python3 bc1.py -i 16S_C3POa.fasta -o 16S.BC1_consensus -p BC1_output/ -s R2C2_Subreads.fastq -f -t 60 -u 5.38:50.ACAG.BDHVBDHVBDHV.AG,3.38:50.ACAG.BDHVBDHVBDHV.CG
 
 ```
+
+Single UMI fl-cDNA without subreads with a 5' UMI containing a sequence spacer and using the 3' sequence of the transcript as an extra "UMI" requiring perfect UMI matches
+
+```bash
+
+python3 bc1.py -i cDNA.trimmed.fasta -o cDNA.trimmed.bc1 -p BC1_output/ -t 30 -u 5.0:12.ACAG.NNNNNTGTTCTGATTNNNNN.TGGT,3.0:10.T.NNNNNNNNNNNNNNN.
+
+```
+
+Standard dual UMI Illumina IGH library allowing for one mismatch in the UMIs and running medaka for polishing
+
+```bash
+
+python3 bc1.py -i IGH.fasta -o IGH.bc1 -p BC1_output/ -u 5.0:12.GACAG.NNNNNNNNNNNNNN.,3.0:12.GACAG.NNNNNNNNNNNNNN. -s R2C2_subreads.fastq -f -t 60 -m
+
+```
+
+## Long Explanations ##
+
+BC1 assumes you have a 
+
+1) Consensus read file (in either fasta or fastq format)
+2) Subread file (in fastq format)
+
+Those can be produced by produced by either R2C2 on ONT sequencers or PacBio Iso-Seq or Kinnex
+
+If you want to use medaka for polishing (-m), it also assumes that the data was produces with R10.4/LSK114 pore/chemistry on ONT sequencers. 
+
+ran C3POa to process R2C2 data. It also assumes that That produces a consensus 
+
+To use BC1, you need to know the sequences surrounding your UMIs. So take a look at the protocol. If you have the bases surrounding your UMI, this is how you structure the syntax. Individual information is separated by periods.
+
+1) What end of the read to look - 5' or 3'with 5' being at the start. For 3', the read is reverse complemented before looking
+2) What position to start looking:What position to stop looking for the UMI.
+3) Bases flanking your UMI on the left
+4) Bases of your UMI (Accepts N, A,T,C,G, and IUPAC base symbols)
+5) Bases flanking your UMI on the right
+
+So if your read looks like this
+
+ATCGTCTTTNNNNANNNNCCCCC
+
+your syntax could look like this
+
+5.4:10.TTT.NNNNANNNN.CCC
+
+if you have more than one UMI, just add another syntaxs separated by a commas
+
 
 ## Run options ##
 
