@@ -31,6 +31,6 @@ rm abPOA-v1.4.1.tar.gz
 
 echo 'Medaka'
 
-pip install medaka
+pip3 install medaka-cpu --extra-index-url https://download.pytorch.org/whl/cpu
 
 echo 'Done'
