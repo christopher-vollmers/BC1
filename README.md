@@ -19,8 +19,16 @@ We designed BC1 to scale with ever increasing read numbers in long-read sequenci
 While we use it mostly with ONT-based R2C2 data, it can be used on regular ONT reads and PacBio CCS reads. In both of those cases, subreads should not be submitted. In the ONT case because there are no subreads.
 In the PacBio case because the subreads naming scheme hasn't been implemented in BC1 yet. Mostly though, PacBio subread files are enormous and therefore take forever to parse.
 
-So, whether you have amplicon data, RNA-seq data, fl-cDNA data, or any other type of single read data (doesn't even have to be long-read data)
+So, whether you have amplicon data, RNA-seq data, fl-cDNA data, or any other type of single read data (doesn't even have to be long-read data) that contains UMIs, BC1 provides you with a single command way of parsing and combining your reads. 
 
+BC1 uses 
+
+[abpoa](https://github.com/yangao07/abPOA) to make a preliminary multi sequence alignment and consensus read
+[racon](https://github.com/isovic/racon) to polish that consensus read with subreads (if provided) or input reads
+
+and optionally
+[medaka](https://github.com/nanoporetech/medaka) to extra polish (slowly) the polished consensus read with subreads (if provided) or input reads
+ 
 Running medaka to polish the output for highest accuracy only makes sense if the data is from ONT sequencers. For now, the pore/chemistry is hardcoded for R10.4/LSK114. It can be change in the code and we plan to ultimately have a flag to set it.
  
 
