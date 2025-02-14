@@ -18,8 +18,8 @@ minimap2=BD1Path+'/minimap2/minimap2'
 
 VERSION = "v0.95 - The readings are off the charts. Over Q50. Even Master Yoda doesn't have a Midi-chlorian count that high"
 
-from utils import extracting_UMIs,extracting_UMIs_STARsolo,create_labeled_subreads,collect_indexes,find_fuzzy_matches,write_new_indexes,read_fasta,findUMISequence,read_fasta_root
-from utils import delegating_consensus_generation, process_batch, determine_consensus,read_cons,write_chimeras,split_reads
+from utils import extracting_UMIs,extracting_UMIs_STARsolo,create_labeled_subreads,collect_indexes,find_fuzzy_matches,write_new_indexes,read_fasta,findUMISequence
+from utils import read_cons,write_chimeras,split_reads,write_labeled_cons_reads
 
 
 parser=argparse.ArgumentParser()
@@ -49,7 +49,7 @@ if subread_file_prelim:
     for subread_files in subread_file_prelim.split(','):
         subreads.append(os.path.abspath(subread_files))
 else:
-    print('no subreads provided. Will use regular input reads for error correction. Input reads have to be fastq in this case.') 
+    print('no subreads provided. Will use regular input reads for error correction.') 
     subreads.append(input_reads)
 subread_file=(',').join(subreads)
 
@@ -119,6 +119,8 @@ def main():
     if not labeledSubreads:
         print('extracting UMIs from', input_reads)
         UMIdict = extracting_UMIs(input_reads,f'{output_path}/tmp/{output_file_root}',UMIpatterns)
+        ### writing out cons reads into what used to be just the labeled subreads file
+        write_labeled_cons_reads(UMIdict,input_reads,f'{output_path}/tmp/{output_file_root}.subreads')
         logfile_object.write(f'extracted UMIs\t{output_path}\t{output_file_root}\t{input_reads}\t{subread_file}\t{UMIpatterns}\t{fuzzy}\t{medaka}\t{subsample}\n')
         logfile_object.flush()
         print('labeling subreads in', subread_file, '(this can take a while)')
@@ -132,7 +134,7 @@ def main():
             all_indexes,first_indexes,second_indexes = collect_indexes(f'{output_path}/tmp/{output_file_root}.subreads')
             print('combine similar UMIs and their Indexes')
             equivalent_indexes,chimeras = find_fuzzy_matches(all_indexes,first_indexes,second_indexes)
-            print('writing and sorting subreads')
+            print('writing fuzzy-matched UMIs and reads')
             write_new_indexes(f'{output_path}/tmp/{output_file_root}.subreads',equivalent_indexes)
             logfile_object.write(f'matched fuzzy\t{output_path}\t{output_file_root}\t{input_reads}\t{subread_file}\t{UMIpatterns}\t{fuzzy}\t{medaka}\t{subsample}\n')
             logfile_object.flush()
@@ -140,11 +142,11 @@ def main():
 
     if not sortedSubreads:
         print('sorting subreads')
-        os.system(f'sort --parallel {threads} -k1,1n -k2,2n -T {output_path} {toSort} > {output_path}/tmp/{output_file_root}.subreads.sorted')
+        os.system(f'sort --parallel {threads} -k2,2n -k3,3n -T {output_path} {toSort} > {output_path}/tmp/{output_file_root}.subreads.sorted')
         logfile_object.write(f'sorted subreads\t{output_path}\t{output_file_root}\t{input_reads}\t{subread_file}\t{UMIpatterns}\t{fuzzy}\t{medaka}\t{subsample}\n')
         logfile_object.flush()
     if not splitSubreads:
-         split_reads(f'{output_path}/tmp/{output_file_root}.subreads.sorted',input_reads,f'{output_path}/tmp/{output_file_root}.UMIs',1000000)
+         split_reads(f'{output_path}/tmp/{output_file_root}.subreads.sorted',1000000)
          logfile_object.write(f'split subreads\t{output_path}\t{output_file_root}\t{input_reads}\t{subread_file}\t{UMIpatterns}\t{fuzzy}\t{medaka}\t{subsample}\n')
          logfile_object.flush()
 
